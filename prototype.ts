@@ -48,6 +48,7 @@ export type OrderBody = {
 };
 
 export class HibachiSDK {
+    accountId: string|number;
     apiKey: string;
     hmacKey: Buffer;
     baseUrl: string;
@@ -57,10 +58,11 @@ export class HibachiSDK {
     lastSignature: string|null;
     lastResponse: any;
     
-    constructor(apiKey: string, hmacKey: Buffer) {
+    constructor(accountId:Number|string, apiKey: string, hmacKey: Buffer, baseUrl: string) {
+        this.accountId = Number(accountId);
         this.apiKey = apiKey;
         this.hmacKey = hmacKey;
-        this.baseUrl = 'https://api-staging.hibachi.xyz'; // Replace with actual base URL
+        this.baseUrl = baseUrl; 
         this.lastNonce = null;
         this.lastOrderBody = null;
         this.lastOrderBuffer = null;
@@ -100,12 +102,19 @@ export class HibachiSDK {
           .integerValue(BigNumber.ROUND_DOWN);
     }
 
+    compressPublicKey(publicKey: string): string {
+        const ec = new elliptic.ec('secp256k1');
+      
+        const pkey = ec.keyFromPublic('04' + publicKey, 'hex');
+        return pkey.getPublic().encodeCompressed('hex');
+      }
+
     decompressPublicKey(publicKey: string): string {
         const ec = new elliptic.ec('secp256k1');
       
         const pkey = ec.keyFromPublic(publicKey, 'hex');
         return pkey.getPublic().encode('hex', false).slice(2);
-    }
+      }
 
     static DigestSerializer = class {
         
@@ -151,21 +160,21 @@ export class HibachiSDK {
         static serializeTransferPayload(payload: TransferPayload, sdk: HibachiSDK): Buffer {
             const decompressedPubKey = sdk.decompressPublicKey(payload.dstPubKey);
             return Buffer.concat([
-                sdk.toBytes(new BigNumber(payload.nonce), 8),
-                sdk.toBytes(payload.assetId, 4),
-                sdk.toBytes(sdk.quantityWithDecimal(6, payload.quantity), 8),
-                Buffer.from(decompressedPubKey, 'hex'),
-                sdk.toBytes(payload.maxFees, 8),
+              sdk.toBytes(new BigNumber(payload.nonce), 8),
+              sdk.toBytes(payload.assetId, 4),
+              sdk.toBytes(sdk.quantityWithDecimal(6, payload.quantity), 8),
+              Buffer.from(decompressedPubKey, 'hex'),
+              sdk.toBytes(payload.maxFees, 8),
             ]);
           }
     };
 
-    createOrder(accountId: number|string, symbol: string, side: OrderSide, orderType: OrderType, quantity: number|string, price: number|string, maxFees = 0.0) {
+    createOrder(symbol: string, side: OrderSide, orderType: OrderType, quantity: number|string, price: number|string, maxFees = 0.0) {
         const nonce = Date.now();
         this.lastNonce = nonce;
 
         const orderBody = {
-            accountId: Number(accountId),
+            accountId: this.accountId,
             symbol: symbol,
             side: side,
             orderType: orderType,
@@ -211,8 +220,8 @@ export class HibachiSDK {
         return response; 
     };
 
-    async getOpenOrders(accountId: number|string) {
-        const url = `${this.baseUrl}/trade/orders?accountId=${Number(accountId)}`;
+    async getOpenOrders() {
+        const url = `${this.baseUrl}/trade/orders?accountId=${Number(this.accountId)}`;
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': this.apiKey,
@@ -225,7 +234,7 @@ export class HibachiSDK {
     }
 
     async getAccountBalance(accountId: number|string) {
-        const url = `${this.baseUrl}/trade/account/info?accountId=${Number(accountId)}`;
+        const url = `${this.baseUrl}/trade/account/info?accountId=${this.accountId}`;
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': this.apiKey,
@@ -236,8 +245,8 @@ export class HibachiSDK {
         return response.data;
     }
 
-    async getSettlementHistory(accountId: number|string) {
-        const url = `${this.baseUrl}/trade/account/settlements_history?accountId=${Number(accountId)}`;
+    async getSettlementHistory() {
+        const url = `${this.baseUrl}/trade/account/settlements_history?accountId=${this.accountId}`;
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': this.apiKey,
@@ -248,11 +257,11 @@ export class HibachiSDK {
         return response.data;        
     }
 
-    async getOrderHistory(accountId: number|string) {
+    async getOrderHistory() {
         /*
         only returns last 100 trades
         */
-        const url = `${this.baseUrl}/trade/account/trades?accountId=${Number(accountId)}`;
+        const url = `${this.baseUrl}/trade/account/trades?accountId=${this.accountId}`;
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': this.apiKey,
@@ -264,7 +273,7 @@ export class HibachiSDK {
         return response.data;
     }
 
-    async cxlOrder(accountId: number|string, orderId: number|string): Promise<any> {
+    async cxlOrder(orderId: number|string): Promise<any> {
         const nonce = Date.now(); // Use current time in milliseconds as nonce
         this.lastNonce = nonce;
 
@@ -280,7 +289,7 @@ export class HibachiSDK {
         // Prepare the API request payload
         const apiRequest = {
             orderId: orderId.toString(),
-            accountId: Number(accountId),
+            accountId: this.accountId,
             nonce: nonce,
             signature: hmacSignature
         };
@@ -306,13 +315,13 @@ export class HibachiSDK {
         }
     }
 
-    async cxlAllOrders(accountId: number|string): Promise<any> {
+    async cxlAllOrders(): Promise<any> {
         const nonce = Date.now();
         this.lastNonce = nonce;
 
         // Prepare the API request payload for canceling all orders
         const apiRequest: any = {
-            accountId: Number(accountId),
+            accountId: this.accountId,
             nonce: nonce
         };
         this.lastOrderBody = apiRequest;
@@ -350,14 +359,14 @@ export class HibachiSDK {
         }
     }
 
-    async editOrder(accountId: number|string, orderId: number|string, orderPayload: OrderPayload, updatedQuantity: number|string, updatedPrice: number|string): Promise<any> {
+    async editOrder(orderId: number|string, orderPayload: OrderPayload, updatedQuantity: number|string, updatedPrice: number|string): Promise<any> {
         const nonce = Date.now();
         this.lastNonce = nonce;
 
         // Prepare the order body with the updated fields
         const orderBodyPre = {
             orderId: orderId.toString(),
-            accountId: Number(accountId),
+            accountId: this.accountId,
             updatedQuantity: updatedQuantity.toString(),
             updatedPrice: updatedPrice.toString(),
             nonce: nonce,
@@ -403,19 +412,20 @@ export class HibachiSDK {
         }
     }
 
-    async withdrawal(accountId: string|number, coin: string, assetId: string|number, quantity: number|string, withdrawalAddress: string, decimal: number|string, network: string = "arbitrum", maxFees="0.0"): Promise<any> {
+    async withdraw(coin: string, assetId: string|number, quantity: number|string, withdrawAddress: string, decimal: number|string, network: string = "arbitrum", maxFees="0.0"): Promise<any> {
         const nonce = Date.now();
+        const withdrawAddressRemoveFirst = withdrawAddress.slice(2);
         this.lastNonce = nonce;
 
-        const withdrawalPayload: WithdrawPayload = {
+        const withdrawPayload: WithdrawPayload = {
             assetId: Number(assetId),
             quantity: quantity.toString(),
             maxFees: maxFees,
-            withdrawalAddress: withdrawalAddress,
+            withdrawalAddress: withdrawAddressRemoveFirst,
             decimal: Number(decimal)
         };
 
-        const orderBuffer = HibachiSDK.DigestSerializer.serializeWithdrawPayload(withdrawalPayload, this);
+        const orderBuffer = HibachiSDK.DigestSerializer.serializeWithdrawPayload(withdrawPayload, this);
         this.lastOrderBuffer = orderBuffer.toString('hex');
 
         //HMAC signature
@@ -424,15 +434,15 @@ export class HibachiSDK {
         .digest('hex');
         this.lastSignature = hmacSignature;
 
-        const withdrawalRequestBody = {
-            accountId: Number(accountId),
+        const withdrawRequestBody = {
+            accountId: this.accountId,
             coin: coin,
             network: network,
-            withdrawAddress: withdrawalPayload.withdrawalAddress,
-            quantity: withdrawalPayload.quantity,
+            withdrawAddress: withdrawAddressRemoveFirst,
+            quantity: withdrawPayload.quantity,
             signature: hmacSignature
         };
-        this.lastOrderBody = withdrawalRequestBody;
+        this.lastOrderBody = withdrawRequestBody;
 
         const url = `${this.baseUrl}/capital/withdraw`;
         const headers = {
@@ -440,22 +450,34 @@ export class HibachiSDK {
             'Authorization': this.apiKey,
         };
       
-        const response: AxiosResponse<any> = await axios.post(url, withdrawalRequestBody, { headers });
+        const response: AxiosResponse<any> = await axios.post(url, withdrawRequestBody, { headers });
         this.lastResponse = response;
         return response; 
 
     }
 
-    async transfer(accountId: string|number, assetId: number|string, quantity: number|string, dstPublicKey: string, coin: string, maxFees="0.0"): Promise<any> {
+    async transfer(assetId: number|string, quantity: number|string, coin: string, receivingAddress: string,maxFees="0.0"): Promise<any> {
         const nonce = Date.now();
         this.lastNonce = nonce;
+
+        const receivingAddressFirst = receivingAddress.slice(2);
+        const urlGetPublicKey = `${this.baseUrl}/capital/transfer-info?receivingAddress=${receivingAddress}`;
+        const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': this.apiKey,
+        };         
+        const keyResponse = await axios.get(urlGetPublicKey, { headers });
+        const dstPublicKey = keyResponse.data.publicKey;
+        const comPubKey = this.compressPublicKey(dstPublicKey.slice(2));
+        const decompressedPubKey = this.decompressPublicKey(comPubKey);
+
 
         const transferPayload: TransferPayload = {
             assetId: new BigNumber(assetId),
             quantity: quantity.toString(),
             maxFees: new BigNumber(maxFees),
             nonce: nonce,
-            dstPubKey: dstPublicKey
+            dstPubKey: comPubKey
         };
 
         const orderBuffer = HibachiSDK.DigestSerializer.serializeTransferPayload(transferPayload, this);
@@ -466,19 +488,16 @@ export class HibachiSDK {
         this.lastSignature = hmacSignature;
 
         const transferBody = {
-            accountId: Number(accountId),
+            accountId: this.accountId,
             coin: coin,
             fees: "0",
             nonce: transferPayload.nonce,
             quantity: quantity.toString(),
-            receivingAddress: transferPayload.dstPubKey,
+            dstPublicKey: decompressedPubKey,
             signature: hmacSignature
         };
         const url = `${this.baseUrl}/capital/transfer`;
-        const headers = {
-            'Content-Type': 'application/json',
-            'Authorization': this.apiKey,
-        };
+
       
         const response: AxiosResponse<any> = await axios.post(url, transferBody, { headers });
         this.lastResponse = response;
@@ -486,63 +505,78 @@ export class HibachiSDK {
 
     };
 
-    async sendBatchOrder(accountId: number|string, orders: any[]): Promise<any> {
-        // Prepare the list to hold serialized orders
-        let serializedOrders: any[] = [];
+   
+    async sendBatchOrder(orders: any[]): Promise<any> {
+        const serializedOrders: any[] = [];
+        let allBuffer: any[] = [];
 
-        for (const order of orders) {
+        for (let order of orders) {
             // Generate a unique nonce for each order if not provided
-            order.nonce = Date.now();
-
-            let orderBuffer: Buffer;
-
-            // Depending on the action, serialize the order accordingly
-            if (order.action === 'place') {
-                orderBuffer = HibachiSDK.DigestSerializer.serializeOrder({
-                    nonce: order.nonce,
-                    contractId: 2, // Assuming contractId is fixed as 2, adjust if necessary
-                    totalQuantity: order.quantity,
-                    side: order.side,
-                    price: order.price,
-                    maxFees: 0.0
-                }, this);
-            } else if (order.action === 'modify') {
-                orderBuffer = HibachiSDK.DigestSerializer.serializeEditPayload(order, this);
-            } else if (order.action === 'cancel') {
-                orderBuffer = HibachiSDK.DigestSerializer.serializeOrderId(order.orderId, this);
-            } else {
-                throw new Error(`Unknown action type: ${order.action}`);
+            if (!order.nonce) {
+                order.nonce = Date.now();
             }
 
-            // Generate the HMAC signature for the order
-            const hmacSignature = crypto.createHmac('sha256', this.hmacKey)
-                .update(orderBuffer)
-                .digest('hex');
-            order.signature = hmacSignature;
-
+            let orderBuffer: Buffer;
+            let hmacSignature: string;
+            // Depending on the action, serialize the order accordingly
+            switch (order.action) {
+                case 'place':
+                    orderBuffer = HibachiSDK.DigestSerializer.serializeOrder({
+                        nonce: order.nonce,
+                        contractId: 2,
+                        totalQuantity: order.quantity,
+                        side: order.side,
+                        price: order.price,
+                        maxFees: 0.0
+                    }, this);
+                    hmacSignature = crypto.createHmac('sha256', this.hmacKey).update(orderBuffer).digest('hex');
+                    order.signature = hmacSignature;
+                    break;
+            
+                case 'modify':
+                    orderBuffer = HibachiSDK.DigestSerializer.serializeOrder({
+                    nonce: order.nonce,
+                    contractId: 2,
+                    totalQuantity: order.updatedQuantity,
+                    side: order.side,
+                    price: order.updatedPrice,
+                    maxFees: 0
+                    }, this);
+                    hmacSignature = crypto.createHmac('sha256', this.hmacKey).update(orderBuffer).digest('hex');
+                    order.signature = hmacSignature;
+                    delete order.side;  // Remove 'side' as it's only needed for buffer
+                    break;
+            
+                case 'cancel':
+                    orderBuffer = HibachiSDK.DigestSerializer.serializeOrderId(order.orderId, this);
+                    hmacSignature = crypto.createHmac('sha256', this.hmacKey).update(orderBuffer).digest('hex');
+                    order.signature = hmacSignature;
+                    break;
+            
+                default:
+                    throw new Error(`Unknown action type: ${order.action}`);
+            }
+            
             // Add the order to the list
             serializedOrders.push(order);
         }
-
-        // Prepare the batch order request
-        const batchOrderRequest = {
-            accountId: Number(accountId),
-            orders: serializedOrders
-        };
-        this.lastOrderBody = batchOrderRequest;
-
-        console.log(batchOrderRequest);
-
-        // Send the batch order request
-        const url = `${this.baseUrl}/trade/orders`;
-        const headers = {
-            'Content-Type': 'application/json',
-            'Authorization': this.apiKey,
-        };
-
-        
-        const response = await axios.post(url, batchOrderRequest, { headers: headers });
-        this.lastResponse = response;
-        return response.data;     
+            
+            // Prepare the batch order request
+            const batchOrderRequest = {
+                accountId: this.accountId,
+                orders: serializedOrders
+                };
+            this.lastOrderBody = serializedOrders;
+            console.log(serializedOrders);
+            
+            // Send the batch order request
+            const url = `${this.baseUrl}/trade/orders`;
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': this.apiKey,
+            };
+            const response = await axios.post(url, batchOrderRequest, { headers });
+            this.lastResponse = response;
+            return response.data;
     }
 }
