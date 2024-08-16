@@ -14,7 +14,7 @@ console.log('SDK initialized.');
 
 (async () => {
     //get account balance
-    const balance = await sdk.getAccountBalance();  
+    const balance = await sdk.getAccountBalance();
     console.log('Account balance got. Response:', balance);
 
     //Create order
@@ -45,7 +45,7 @@ console.log('SDK initialized.');
     const secondOrderbody = sdk.createOrder('BTC/USDT-P', 'ASK', 'LIMIT', "0.00001", "100002.0");
     const response2 = await sdk.sendOrder(secondOrderbody);
     console.log("Created OrderId:", response2.data);
-    
+
     //Get open orders
     const openOrders = await sdk.getOpenOrders();  //Fill acountId: number|string
     console.log('Open Orders:', openOrders);
@@ -63,7 +63,7 @@ console.log('SDK initialized.');
     //edit order
     const tempOid2 = openOrders2[0]["orderId"];
     const tempOrder = openOrders2[0];
-    const editOrder = await sdk.editOrder(tempOid2, tempOrder, "0.0001", "100003"); 
+    const editOrder = await sdk.editOrder(tempOid2, tempOrder, "0.0001", "100003");
     /* Fill acountId: number|string, orderId number|string, 
     orderPayload: orderPayload (Obtain this by running sdk.getOpenOrders()),
     quantity: number|string, price: number|string
@@ -81,14 +81,14 @@ console.log('SDK initialized.');
     const openOrders3 = await sdk.getOpenOrders();
     console.log('Number of open orders:', openOrders3.length);//should be 0 if all the orders are cancelled
 
-    
+
     const balance2 = await sdk.getAccountBalance();  //Fill accountId: number|string
     console.log('Account balance before the withdrawal. Response:', balance2);
     console.log('begin to withdrawal');
-    const withdrawResponse = sdk.withdraw('USDT', '1', '1', "receivingAddress",'6');
+    const withdrawResponse = sdk.withdraw('USDT', '1', '1', "receivingAddress", '6');
     /* coin: string, e.g. ("USTD"), assetId: string|number, withdrawalAddress: string,
-    decimal: number|string */
-    
+    decimal: number|string, network: string this is default to "arbitrum" you can replace it with your network */
+
     const balance3 = await sdk.getAccountBalance();  //Fill accountId: number|string
     console.log('Account balance after the withdrawal. Response:', balance3);
 
@@ -135,7 +135,7 @@ console.log('SDK initialized.');
             orderId: "12345",  // Example order ID to cancel
         }
     ];
-        
+
     const batchResponse = await sdk.sendBatchOrder(orders);
     console.log('Batch Order Response:', batchResponse);
 })();
