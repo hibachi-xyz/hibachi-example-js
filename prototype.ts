@@ -508,13 +508,11 @@ export class HibachiSDK {
    
     async sendBatchOrder(orders: any[]): Promise<any> {
         const serializedOrders: any[] = [];
-        let allBuffer: any[] = [];
+        let count = 0;
 
         for (let order of orders) {
-            // Generate a unique nonce for each order if not provided
-            if (!order.nonce) {
-                order.nonce = Date.now();
-            }
+            order.nonce = Date.now()+count;
+            count = count+1;
 
             let orderBuffer: Buffer;
             let hmacSignature: string;
@@ -567,7 +565,7 @@ export class HibachiSDK {
                 orders: serializedOrders
                 };
             this.lastOrderBody = serializedOrders;
-            console.log(serializedOrders);
+            console.log(batchOrderRequest);
             
             // Send the batch order request
             const url = `${this.baseUrl}/trade/orders`;

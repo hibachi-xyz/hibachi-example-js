@@ -1,0 +1,9 @@
+# Package Manager
+node_modules/
+
+# dependencies
+/node_modules
+
+
+# misc
+.DS_Store

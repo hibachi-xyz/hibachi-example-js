@@ -114,25 +114,18 @@ console.log('SDK initialized.');
             price: "100010",
         },
         {
-            action: "place",
+            action: "modify",
             symbol: "BTC/USDT-P",
+            orderId: "00000000000000", //replace it with the orderId you want to modify
             orderType: "LIMIT",
             side: "ASK",
-            quantity: ".0001",
-            price: "100011",
+            updatedQuantity: "0.001",
+            updatedPrice: "100000.1",
         },
-        {
-            action: "modify",
-            orderId: "12345",  // Example order ID to modify
-            symbol: "BTC/USDT-P",
-            orderType: "LIMIT",
-            side: "BID",  // Side should be included for buffer creation, will be removed afterward
-            updatedQuantity: ".0002",
-            updatedPrice: "100015",
-        },
+
         {
             action: "cancel",
-            orderId: "12345",  // Example order ID to cancel
+            orderId: "00000000000000",  // replace it with the orderId you want to cancel
         }
     ];
 
