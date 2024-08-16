@@ -233,6 +233,7 @@ export class HibachiSDK {
         return response.data;
     }
 
+
     async getAccountBalance(accountId: number|string) {
         const url = `${this.baseUrl}/trade/account/info?accountId=${this.accountId}`;
         const headers = {
