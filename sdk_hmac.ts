@@ -47,7 +47,7 @@ export type OrderBody = {
     signature: string,
 };
 
-export class HibachiSDK {
+export class HibachiHmacSDK {
     accountId: string|number;
     apiKey: string;
     hmacKey: Buffer;
@@ -119,7 +119,7 @@ export class HibachiSDK {
     static DigestSerializer = class {
         
         static serializeOrder(payload: OrderPayload, 
-            sdk: HibachiSDK): Buffer {
+            sdk: HibachiHmacSDK): Buffer {
             const totalQuantity = sdk.quantityFromReal(Number(payload.totalQuantity));
             const price = payload.price ? sdk.priceFromReal(Number(payload.price)) : null;
             const maxFees = sdk.quantityFromReal(payload.maxFees);
@@ -133,12 +133,12 @@ export class HibachiSDK {
               ]);
         };
 
-        static serializeOrderId(orderId: string, sdk: HibachiSDK): Buffer {
+        static serializeOrderId(orderId: string, sdk: HibachiHmacSDK): Buffer {
             return Buffer.concat([sdk.toBytes(new BigNumber(orderId), 8)]);
         };    
 
 
-        static serializeWithdrawPayload(payload: WithdrawPayload, sdk: HibachiSDK) {
+        static serializeWithdrawPayload(payload: WithdrawPayload, sdk: HibachiHmacSDK) {
             const realQuantity = sdk.quantityWithDecimal(payload.decimal, payload.quantity);
             return Buffer.concat([
               sdk.toBytes(new BigNumber(payload.assetId), 4),
@@ -148,7 +148,7 @@ export class HibachiSDK {
             ]);
         };
 
-        static serializeEditPayload(payload: any, sdk: HibachiSDK) {
+        static serializeEditPayload(payload: any, sdk: HibachiHmacSDK) {
             return Buffer.concat([
                 sdk.toBytes(new BigNumber(payload.OrderId), 8),
                 sdk.toBytes(new BigNumber(payload.nonce), 8),
@@ -157,7 +157,7 @@ export class HibachiSDK {
               ]);
         };
 
-        static serializeTransferPayload(payload: TransferPayload, sdk: HibachiSDK): Buffer {
+        static serializeTransferPayload(payload: TransferPayload, sdk: HibachiHmacSDK): Buffer {
             const decompressedPubKey = sdk.decompressPublicKey(payload.dstPubKey);
             return Buffer.concat([
               sdk.toBytes(new BigNumber(payload.nonce), 8),
@@ -186,7 +186,7 @@ export class HibachiSDK {
         };
 
         this.lastOrderBody = orderBody;
-        const orderBuffer = HibachiSDK.DigestSerializer.serializeOrder({
+        const orderBuffer = HibachiHmacSDK.DigestSerializer.serializeOrder({
             nonce: orderBody.nonce,
             contractId: 2, // Assuming contractId is fixed as 2, adjust if necessary
             totalQuantity: orderBody.quantity,
@@ -279,7 +279,7 @@ export class HibachiSDK {
         this.lastNonce = nonce;
 
         // Serialize the order ID for signature
-        const orderBuffer = HibachiSDK.DigestSerializer.serializeOrderId(orderId.toString(), this);
+        const orderBuffer = HibachiHmacSDK.DigestSerializer.serializeOrderId(orderId.toString(), this);
 
         // Generate HMAC signature
         const hmacSignature = crypto.createHmac('sha256', this.hmacKey)
@@ -375,7 +375,7 @@ export class HibachiSDK {
         };
 
         // Serialize the order for the signature
-        const orderBuffer = HibachiSDK.DigestSerializer.serializeOrder({
+        const orderBuffer = HibachiHmacSDK.DigestSerializer.serializeOrder({
             nonce: nonce,
             contractId: 2,  // Assuming contractId is fixed as 2, adjust if necessary
             totalQuantity: updatedQuantity.toString(),
@@ -426,7 +426,7 @@ export class HibachiSDK {
             decimal: Number(decimal)
         };
 
-        const orderBuffer = HibachiSDK.DigestSerializer.serializeWithdrawPayload(withdrawPayload, this);
+        const orderBuffer = HibachiHmacSDK.DigestSerializer.serializeWithdrawPayload(withdrawPayload, this);
         this.lastOrderBuffer = orderBuffer.toString('hex');
 
         //HMAC signature
@@ -481,7 +481,7 @@ export class HibachiSDK {
             dstPubKey: comPubKey
         };
 
-        const orderBuffer = HibachiSDK.DigestSerializer.serializeTransferPayload(transferPayload, this);
+        const orderBuffer = HibachiHmacSDK.DigestSerializer.serializeTransferPayload(transferPayload, this);
         //HMAC signature
         const hmacSignature = crypto.createHmac('sha256', this.hmacKey)
         .update(orderBuffer)
@@ -520,7 +520,7 @@ export class HibachiSDK {
             // Depending on the action, serialize the order accordingly
             switch (order.action) {
                 case 'place':
-                    orderBuffer = HibachiSDK.DigestSerializer.serializeOrder({
+                    orderBuffer = HibachiHmacSDK.DigestSerializer.serializeOrder({
                         nonce: order.nonce,
                         contractId: 2,
                         totalQuantity: order.quantity,
@@ -533,7 +533,7 @@ export class HibachiSDK {
                     break;
             
                 case 'modify':
-                    orderBuffer = HibachiSDK.DigestSerializer.serializeOrder({
+                    orderBuffer = HibachiHmacSDK.DigestSerializer.serializeOrder({
                     nonce: order.nonce,
                     contractId: 2,
                     totalQuantity: order.updatedQuantity,
@@ -547,7 +547,7 @@ export class HibachiSDK {
                     break;
             
                 case 'cancel':
-                    orderBuffer = HibachiSDK.DigestSerializer.serializeOrderId(order.orderId, this);
+                    orderBuffer = HibachiHmacSDK.DigestSerializer.serializeOrderId(order.orderId, this);
                     hmacSignature = crypto.createHmac('sha256', this.hmacKey).update(orderBuffer).digest('hex');
                     order.signature = hmacSignature;
                     break;
@@ -579,3 +579,4 @@ export class HibachiSDK {
             return response.data;
     }
 }
+

@@ -1,14 +1,15 @@
-const { HibachiSDK } = require('./prototype.ts');
+const { HibachiEcdsaSDK } = require('./sdk_ecdsa.ts');
 
 
 // Usage example:
 
-const accountId = 123456789; //Replace with your own account ID, string or number
-const apiKey = "example_of_api_key";  // Replace with your actual API key
-const hmacKey = Buffer.from('example_of_private_key');  // Replace with your actual HMAC key
+const accountId = 123456; //Replace with your own account ID, string or number
+const apiKey = "api-keyHFB5GA4OWEgOkd0=";  // Replace with your actual API key
+const publicKey = "publickey"; // Replace with your actual public key
+const privateKey = "privatekey";  // Replace with your actual private key
 const baseUrl = 'https://api-staging.hibachi.xyz' // Replace with actual base URL
 
-const sdk = new HibachiSDK(accountId, apiKey, hmacKey, baseUrl);
+const sdk = new HibachiEcdsaSDK(accountId, apiKey, publicKey, privateKey, baseUrl);
 
 console.log('SDK initialized.');
 
@@ -24,6 +25,7 @@ console.log('SDK initialized.');
 
     //send the order, you must send the order after you create it
     const response = await sdk.sendOrder(orderBody);
+    console.log('Order response:', orderBody);    
     /*
     You SHOUDLD NOT create orderBody by yourself, use sdk.createOrder() method to create
 
@@ -116,7 +118,7 @@ console.log('SDK initialized.');
         {
             action: "modify",
             symbol: "BTC/USDT-P",
-            orderId: "00000000000000", //replace it with the orderId you want to modify
+            orderId: openOrders[0]["orderId"], //replace it with the orderId you want to modify
             orderType: "LIMIT",
             side: "ASK",
             updatedQuantity: "0.001",
@@ -125,7 +127,7 @@ console.log('SDK initialized.');
 
         {
             action: "cancel",
-            orderId: "00000000000000",  // replace it with the orderId you want to cancel
+            orderId:openOrders[0]["orderId"],  // replace it with the orderId you want to cancel
         }
     ];
 
