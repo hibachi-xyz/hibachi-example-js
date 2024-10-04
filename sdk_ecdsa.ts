@@ -1,6 +1,6 @@
 import { BigNumber } from 'bignumber.js';
 import * as crypto from 'crypto';
-import elliptic from 'elliptic';
+import * as elliptic from 'elliptic';
 import { ethers } from 'ethers';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import { Signature } from 'ethers';
@@ -48,7 +48,7 @@ export type OrderBody = {
 };
 
 export class HibachiEcdsaSDK {
-    accountId: string|number;
+    accountId: number;
     apiKey: string;
     publicKey: string;
     privateKey: string;
@@ -59,7 +59,7 @@ export class HibachiEcdsaSDK {
     lastSignature: string|null;
     lastResponse: any;
     
-    constructor(accountId:Number|string, apiKey: string, publicKey: string, privateKey: string, baseUrl: string) {
+    constructor(accountId: number, apiKey: string, publicKey: string, privateKey: string, baseUrl: string) {
         this.accountId = Number(accountId);
         this.apiKey = apiKey;
         this.publicKey = publicKey;

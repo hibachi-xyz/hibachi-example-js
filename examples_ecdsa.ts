@@ -1,4 +1,4 @@
-const { HibachiEcdsaSDK } = require('./sdk_ecdsa.ts');
+import { HibachiEcdsaSDK } from './sdk_ecdsa.ts';
 
 
 // Usage example:
@@ -15,7 +15,7 @@ console.log('SDK initialized.');
 
 (async () => {
     //get account balance
-    const balance = await sdk.getAccountBalance();
+    const balance = await sdk.getAccountBalance(accountId);
     console.log('Account balance got. Response:', balance);
 
     //Create order
@@ -84,21 +84,21 @@ console.log('SDK initialized.');
     console.log('Number of open orders:', openOrders3.length);//should be 0 if all the orders are cancelled
 
 
-    const balance2 = await sdk.getAccountBalance();  //Fill accountId: number|string
+    const balance2 = await sdk.getAccountBalance(accountId);  //Fill accountId: number|string
     console.log('Account balance before the withdrawal. Response:', balance2);
     console.log('begin to withdrawal');
     const withdrawResponse = sdk.withdraw('USDT', '1', '1', "receivingAddress", '6');
     /* coin: string, e.g. ("USTD"), assetId: string|number, withdrawalAddress: string,
     decimal: number|string, network: string this is default to "arbitrum" you can replace it with your network */
 
-    const balance3 = await sdk.getAccountBalance();  //Fill accountId: number|string
+    const balance3 = await sdk.getAccountBalance(accountId);  //Fill accountId: number|string
     console.log('Account balance after the withdrawal. Response:', balance3);
 
     //Transfer crypto to another subaccount
     const transfer = sdk.transfer('1', "1", 'USDT', 'receivingAddress');
     /* assetId: string|number, quantity: number|string, coin: string,
     receivingAddress: string, begin with "0x" */
-    const balance4 = await sdk.getAccountBalance();
+    const balance4 = await sdk.getAccountBalance(accountId);
     console.log('Account balance after the transfer. Response:', balance4);
 
     //Get order history

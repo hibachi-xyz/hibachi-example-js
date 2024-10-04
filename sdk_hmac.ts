@@ -1,6 +1,6 @@
 import { BigNumber } from 'bignumber.js';
 import * as crypto from 'crypto';
-import elliptic from 'elliptic';
+import * as elliptic from 'elliptic';
 import { ethers } from 'ethers';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import { Signature } from 'ethers';
@@ -48,7 +48,7 @@ export type OrderBody = {
 };
 
 export class HibachiHmacSDK {
-    accountId: string|number;
+    accountId: number;
     apiKey: string;
     hmacKey: Buffer;
     baseUrl: string;
@@ -58,7 +58,7 @@ export class HibachiHmacSDK {
     lastSignature: string|null;
     lastResponse: any;
     
-    constructor(accountId:Number|string, apiKey: string, hmacKey: Buffer, baseUrl: string) {
+    constructor(accountId: number, apiKey: string, hmacKey: Buffer, baseUrl: string) {
         this.accountId = Number(accountId);
         this.apiKey = apiKey;
         this.hmacKey = hmacKey;
