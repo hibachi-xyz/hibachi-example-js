@@ -556,7 +556,8 @@ export class HibachiEcdsaSDK {
         this.lastNonce = nonce;
 
         const receivingAddressFirst = receivingAddress.slice(2);
-        const urlGetPublicKey = `${this.baseUrl}/capital/transfer-info?receivingAddress=${receivingAddress}&accountId=${this.accountId}`;
+        const receivingAddressLower = receivingAddress.toLowerCase();
+        const urlGetPublicKey = `${this.baseUrl}/capital/transfer-info?receivingAddress=${receivingAddressLower}&accountId=${this.accountId}`;
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': this.apiKey,
