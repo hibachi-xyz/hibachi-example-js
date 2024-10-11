@@ -5,7 +5,7 @@ import { ethers } from 'ethers';
 import axios, { AxiosResponse, AxiosError } from 'axios';
 import { Signature } from 'ethers';
 
-
+const FEE_MULTIPLIER = new BigNumber(10).pow(8);
 const PRICE_MULTIPLIER = new BigNumber(2).pow(32);
 export type OrderSide = 'BID' | 'ASK';
 export type OrderType = 'LIMIT' | 'MARKET';
@@ -16,8 +16,8 @@ export type OrderPayload = {
     side: OrderSide;
     price?: string | undefined;
     totalQuantity: string;
-    maxFees: number;
-  };
+    maxFees?: number;
+};
 
 export type TransferPayload = {
     assetId: BigNumber;
@@ -30,7 +30,7 @@ export type TransferPayload = {
 export type WithdrawPayload = {
     assetId: number;
     quantity: string;
-    maxFees: string;
+    maxFees: BigNumber;
     withdrawalAddress: string;
     decimal: number;
   };
@@ -41,7 +41,7 @@ export type OrderBody = {
     side: OrderSide,
     orderType: OrderType,
     quantity: string,
-    maxFees: number,
+    maxFeesPercent: string,
     price: string,
     nonce: number,
     signature: string,
@@ -100,15 +100,18 @@ export class HibachiEcdsaSDK {
         ]);
       }
 
-    quantityFromReal(quantity: number): BigNumber {
-        const underlyingDecimals = 10;
+    feesPercentWithDecimal(fees: number | string | BigNumber): BigNumber {
+        return new BigNumber(fees).multipliedBy(FEE_MULTIPLIER);
+    }
+
+    quantityFromReal(quantity: number, underlyingDecimals: number): BigNumber {
         return new BigNumber(quantity)
           .shiftedBy(underlyingDecimals)
           .integerValue(BigNumber.ROUND_DOWN);
       }
     
-    priceFromReal(price: number): BigNumber {
-        const decimals = -4;      
+    priceFromReal(price: number, underlyingDecimals:number): BigNumber {
+        const decimals = 6-underlyingDecimals;       
         return new BigNumber(price)
           .shiftedBy(decimals)
           .multipliedBy(PRICE_MULTIPLIER)
@@ -147,21 +150,25 @@ export class HibachiEcdsaSDK {
       }
 
     static DigestSerializer = class {
-        
+
         static serializeOrder(payload: OrderPayload, 
-            sdk: HibachiEcdsaSDK): Buffer {
-            const totalQuantity = sdk.quantityFromReal(Number(payload.totalQuantity));
-            const price = payload.price ? sdk.priceFromReal(Number(payload.price)) : null;
-            const maxFees = sdk.quantityFromReal(payload.maxFees);
-            return Buffer.concat([
-                sdk.toBytes(new BigNumber(payload.nonce), 8),
-                sdk.toBytes(new BigNumber(payload.contractId), 4),
-                sdk.toBytes(totalQuantity, 8),
-                sdk.toBytes(new BigNumber(payload.side === 'ASK' ? 0 : 1), 4),
-                ...(price ? [sdk.toBytes(price, 8)] : []),
-                sdk.toBytes(maxFees, 8),
-              ]);
-        };
+          sdk: HibachiEcdsaSDK, underlyingDecimals: number): Buffer {
+          const totalQuantity = sdk.quantityFromReal(Number(payload.totalQuantity), underlyingDecimals);
+          const price = payload.price ? sdk.priceFromReal(Number(payload.price), underlyingDecimals) : null;
+          const maxFees =
+          payload.maxFees !== undefined
+            ? new BigNumber(payload.maxFees)
+            : new BigNumber(0);
+          const realMaxFees = sdk.feesPercentWithDecimal(maxFees);
+          return Buffer.concat([
+              sdk.toBytes(new BigNumber(payload.nonce), 8),
+              sdk.toBytes(new BigNumber(payload.contractId), 4),
+              sdk.toBytes(totalQuantity, 8),
+              sdk.toBytes(new BigNumber(payload.side === 'ASK' ? 0 : 1), 4),
+              ...(price ? [sdk.toBytes(price, 8)] : []),
+              sdk.toBytes(realMaxFees, 8),
+            ]);
+      };
 
         static serializeOrderId(orderId: string, sdk: HibachiEcdsaSDK): Buffer {
             return Buffer.concat([sdk.toBytes(new BigNumber(orderId), 8)]);
@@ -169,37 +176,42 @@ export class HibachiEcdsaSDK {
 
 
         static serializeWithdrawPayload(payload: WithdrawPayload, sdk: HibachiEcdsaSDK) {
-            const realQuantity = sdk.quantityWithDecimal(payload.decimal, payload.quantity);
-            return Buffer.concat([
+          const realQuantity = sdk.quantityWithDecimal(payload.decimal, payload.quantity);
+          const realMaxFees = sdk.quantityWithDecimal(
+              payload.decimal,
+              payload.maxFees.toString()
+            );
+          return Buffer.concat([
               sdk.toBytes(new BigNumber(payload.assetId), 4),
               sdk.toBytes(realQuantity, 8),
-              sdk.toBytes(new BigNumber(payload.maxFees), 8),
+              sdk.toBytes(realMaxFees, 8),
               Buffer.from(payload.withdrawalAddress, 'hex'),
             ]);
-        };
+      };
 
-        static serializeEditPayload(payload: any, sdk: HibachiEcdsaSDK) {
-            return Buffer.concat([
-                sdk.toBytes(new BigNumber(payload.OrderId), 8),
-                sdk.toBytes(new BigNumber(payload.nonce), 8),
-                sdk.toBytes(sdk.quantityFromReal(payload.updatedQuantity), 8),
-                sdk.toBytes(sdk.priceFromReal(payload.updatedPrice), 8)
-              ]);
-        };
-
-        static serializeTransferPayload(payload: TransferPayload, sdk: HibachiEcdsaSDK): Buffer {
-            const decompressedPubKey = sdk.decompressPublicKey(payload.dstPubKey);
-            return Buffer.concat([
-              sdk.toBytes(new BigNumber(payload.nonce), 8),
-              sdk.toBytes(payload.assetId, 4),
-              sdk.toBytes(sdk.quantityWithDecimal(6, payload.quantity), 8),
-              Buffer.from(decompressedPubKey, 'hex'),
-              sdk.toBytes(payload.maxFees, 8),
-            ]);
-          }
+      static serializeEditPayload(payload: any, sdk: HibachiEcdsaSDK, underlyingDecimals: number) {
+        return Buffer.concat([
+            sdk.toBytes(new BigNumber(payload.OrderId), 8),
+            sdk.toBytes(new BigNumber(payload.nonce), 8),
+            sdk.toBytes(sdk.quantityFromReal(payload.updatedQuantity, underlyingDecimals), 8),
+            sdk.toBytes(sdk.priceFromReal(payload.updatedPrice, underlyingDecimals), 8)
+          ]);
     };
 
-    createOrder(symbol: string, side: OrderSide, orderType: OrderType, quantity: number|string, price: number|string, maxFees = 0.0) {
+    static serializeTransferPayload(payload: TransferPayload, sdk: HibachiEcdsaSDK): Buffer {
+      const decompressedPubKey = sdk.decompressPublicKey(payload.dstPubKey);
+      const realMaxFees = sdk.feesPercentWithDecimal(payload.maxFees);
+      return Buffer.concat([
+        sdk.toBytes(new BigNumber(payload.nonce), 8),
+        sdk.toBytes(payload.assetId, 4),
+        sdk.toBytes(sdk.quantityWithDecimal(6, payload.quantity), 8),
+        Buffer.from(decompressedPubKey, 'hex'),
+        sdk.toBytes(realMaxFees, 8),
+      ]);
+    }
+    };
+
+    createOrder(symbol: string, side: OrderSide, orderType: OrderType, quantity: number|string, price: number|string, maxFeesPercent: string, contractId: number, underlyingDecimals: number) {
         const nonce = Date.now();
         this.lastNonce = nonce;
 
@@ -209,7 +221,7 @@ export class HibachiEcdsaSDK {
             side: side,
             orderType: orderType,
             quantity: quantity.toString(),
-            maxFees: maxFees,
+            maxFeesPercent: maxFeesPercent,
             price: price.toString(),
             nonce: nonce,
             signature: "",
@@ -218,12 +230,13 @@ export class HibachiEcdsaSDK {
         this.lastOrderBody = orderBody;
         const orderBuffer = HibachiEcdsaSDK.DigestSerializer.serializeOrder({
             nonce: orderBody.nonce,
-            contractId: 2, // Assuming contractId is fixed as 2, adjust if necessary
+            contractId: contractId,
             totalQuantity: orderBody.quantity,
             side: orderBody.side,
             price: orderBody.price,
-            maxFees: orderBody.maxFees
-        }, this);
+            maxFees: Number(orderBody.maxFeesPercent)
+        }, this, underlyingDecimals);
+
         this.lastOrderBuffer = orderBuffer.toString('hex');
 
         let signaturePayload = "";
@@ -420,7 +433,7 @@ export class HibachiEcdsaSDK {
         }
     }
 
-    async editOrder(orderId: number|string, orderPayload: OrderPayload, updatedQuantity: number|string, updatedPrice: number|string): Promise<any> {
+    async editOrder(orderId: number|string, orderPayload: OrderPayload, updatedQuantity: number|string, updatedPrice: number|string, maxFeesPercent: string, contractId:number, underlyingDecimals:number): Promise<any> {
         const nonce = Date.now();
         this.lastNonce = nonce;
 
@@ -431,21 +444,21 @@ export class HibachiEcdsaSDK {
             updatedQuantity: updatedQuantity.toString(),
             updatedPrice: updatedPrice.toString(),
             nonce: nonce,
-            signature: ""
+            signature: "",
+            maxFeesPercent: maxFeesPercent,
         };
 
         // Serialize the order for the signature
         const orderBuffer = HibachiEcdsaSDK.DigestSerializer.serializeOrder({
             nonce: nonce,
-            contractId: 2,  // Assuming contractId is fixed as 2, adjust if necessary
+            contractId: contractId,  // Assuming contractId is fixed as 2, adjust if necessary
             totalQuantity: updatedQuantity.toString(),
             side: orderPayload.side,
             price: updatedPrice.toString(),
-            maxFees: 0.0
-        }, this);
+            maxFees: Number(maxFeesPercent),
+        }, this, underlyingDecimals);
 
         this.lastOrderBuffer = orderBuffer.toString('hex');
-        console.log(orderBuffer);
 
         let signaturePayload = "";
         const ecdsaSignature = this.signMessageSha256(
@@ -483,7 +496,7 @@ export class HibachiEcdsaSDK {
         }
     }
 
-    async withdraw(coin: string, assetId: string|number, quantity: number|string, withdrawAddress: string, decimal: number|string, network: string = "arbitrum", maxFees="0.0"): Promise<any> {
+    async withdraw(coin: string, assetId: string|number, quantity: number|string, withdrawAddress: string, decimal: number|string, maxFees: string, network: string = "arbitrum"): Promise<any> {
         const nonce = Date.now();
         const withdrawAddressRemoveFirst = withdrawAddress.slice(2);
         this.lastNonce = nonce;
@@ -491,7 +504,7 @@ export class HibachiEcdsaSDK {
         const withdrawPayload: WithdrawPayload = {
             assetId: Number(assetId),
             quantity: quantity.toString(),
-            maxFees: maxFees,
+            maxFees: new BigNumber(maxFees),
             withdrawalAddress: withdrawAddressRemoveFirst,
             decimal: Number(decimal)
         };
@@ -519,6 +532,7 @@ export class HibachiEcdsaSDK {
             accountId: this.accountId,
             coin: coin,
             network: network,
+            maxFees: maxFees,
             withdrawAddress: withdrawAddressRemoveFirst,
             quantity: withdrawPayload.quantity,
             signature: signaturePayload
@@ -537,17 +551,17 @@ export class HibachiEcdsaSDK {
 
     }
 
-    async transfer(assetId: number|string, quantity: number|string, coin: string, receivingAddress: string,maxFees="0.0"): Promise<any> {
+    async transfer(assetId: number|string, quantity: number|string, coin: string, receivingAddress: string, maxFees: string): Promise<any> {
         const nonce = Date.now();
         this.lastNonce = nonce;
 
         const receivingAddressFirst = receivingAddress.slice(2);
-        const urlGetPublicKey = `${this.baseUrl}/capital/transfer-info?receivingAddress=${receivingAddress}`;
+        const urlGetPublicKey = `${this.baseUrl}/capital/transfer-info?receivingAddress=${receivingAddress}&accountId=${this.accountId}`;
         const headers = {
             'Content-Type': 'application/json',
             'Authorization': this.apiKey,
         };         
-        const keyResponse = await axios.get(urlGetPublicKey, { headers });
+        const keyResponse = await axios.get(urlGetPublicKey, { headers: headers });
         const dstPublicKey = keyResponse.data.publicKey;
         const comPubKey = this.compressPublicKey(dstPublicKey.slice(2));
         const decompressedPubKey = this.decompressPublicKey(comPubKey);
@@ -581,7 +595,7 @@ export class HibachiEcdsaSDK {
         const transferBody = {
             accountId: this.accountId,
             coin: coin,
-            fees: "0",
+            fees: maxFees,
             nonce: transferPayload.nonce,
             quantity: quantity.toString(),
             dstPublicKey: decompressedPubKey,
@@ -616,12 +630,12 @@ export class HibachiEcdsaSDK {
                 case 'place':
                     orderBuffer = HibachiEcdsaSDK.DigestSerializer.serializeOrder({
                         nonce: order.nonce,
-                        contractId: 2,
+                        contractId: Number(order.contractId),
                         totalQuantity: order.quantity,
                         side: order.side,
                         price: order.price,
-                        maxFees: 0.0
-                    }, this);
+                        maxFees: Number(order.maxFeesPercent),
+                    }, this, Number(order.underlyingDecimals));
 
                     ecdsaSignature = this.signMessageSha256(
                         {
@@ -646,8 +660,9 @@ export class HibachiEcdsaSDK {
                     totalQuantity: order.updatedQuantity,
                     side: order.side,
                     price: order.updatedPrice,
-                    maxFees: 0
-                    }, this);
+                    maxFees: Number(order.maxFeesPercent),
+                    }, this, order.underlyingDecimals);
+
                     ecdsaSignature = this.signMessageSha256(
                         {
                           from: this.compressPublicKey(this.publicKey.substring(2)),

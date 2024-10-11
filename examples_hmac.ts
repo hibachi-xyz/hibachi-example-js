@@ -3,10 +3,10 @@ import { HibachiHmacSDK } from './sdk_hmac.ts';
 
 // Usage example:
 
-const accountId = 123456; //Replace with your own account ID, string or number
-const apiKey = "api-key";  // Replace with your actual API key
-const hmacKey = Buffer.from('private-key');  // Replace with your actual HMAC key
-const baseUrl = 'https://api-staging.hibachi.xyz' // Replace with actual base URL
+const accountId = 123; //Replace with your own account ID, string or number
+const apiKey = "your-api-key";  // Replace with your actual API key
+const hmacKey = Buffer.from('your-private-key');  // Replace with your actual HMAC key
+const baseUrl = 'https://api.hibachi.xyz' // Replace with actual base URL
 
 const sdk = new HibachiHmacSDK(accountId, apiKey, hmacKey, baseUrl);
 
@@ -18,8 +18,9 @@ console.log('SDK initialized.');
     console.log('Account balance got. Response:', balance);
 
     //Create order
-    const orderBody = sdk.createOrder('BTC/USDT-P', 'ASK', 'LIMIT', "0.00001", "100004.0");
-    //Fill acountId: number|string, symbol: string, side: 'ASK' or 'BID', orderType: 'Limit' or 'MARKET', quantity: number|string, price: number|string
+    const orderBody = sdk.createOrder('SOL/USDT-P', 'ASK', 'LIMIT', "0.00001", "100004.0", "0.045", 3, 8);
+    //Fill acountId: number|string, symbol: string, side: 'ASK' or 'BID', orderType: 'Limit' or 'MARKET', quantity: number|string, 
+    //price: number|string, maxFeesPercent: string, contractId: number, underlyingDecimals: number
     console.log('Order created:', orderBody);
 
     //send the order, you must send the order after you create it
@@ -33,16 +34,16 @@ console.log('SDK initialized.');
     side: OrderSide,
     orderType: OrderType,
     quantity: string,
-    maxFees: number,
+    maxFeesPercent: string,
     price: string,
     nonce: number,
     signature: string,
     };
     */
-    //console.log('Created OrderId', response.data);
+    console.log('Created OrderId', response.data);
 
     //second order
-    const secondOrderbody = sdk.createOrder('BTC/USDT-P', 'ASK', 'LIMIT', "0.00001", "100002.0");
+    const secondOrderbody = sdk.createOrder('BTC/USDT-P', 'ASK', 'LIMIT', "0.00001", "100002.0","0.045", 2, 10);
     const response2 = await sdk.sendOrder(secondOrderbody);
     console.log("Created OrderId:", response2.data);
 
@@ -63,11 +64,13 @@ console.log('SDK initialized.');
     //edit order
     const tempOid2 = openOrders2[0]["orderId"];
     const tempOrder = openOrders2[0];
-    const editOrder = await sdk.editOrder(tempOid2, tempOrder, "0.0001", "100003");
-    /* Fill acountId: number|string, orderId number|string, 
+    console.log(tempOrder);
+    const editOrder = await sdk.editOrder(tempOid2, tempOrder, "0.0001", "100005", "0.045", 3, 8);
+    /* Fill orderId number|string, 
     orderPayload: orderPayload (Obtain this by running sdk.getOpenOrders()),
-    quantity: number|string, price: number|string
+    quantity: number|string, price: number|string, maxFeesPercent: string, contractId, underlyingDecimals:number
     */
+    console.log(tempOrder);
     console.log('Edit Order', editOrder);
 
     //get settlements
@@ -85,19 +88,14 @@ console.log('SDK initialized.');
     const balance2 = await sdk.getAccountBalance(accountId);  //Fill accountId: number|string
     console.log('Account balance before the withdrawal. Response:', balance2);
     console.log('begin to withdrawal');
-    const withdrawResponse = sdk.withdraw('USDT', '1', '1', "receivingAddress", '6');
+    const withdrawResponse = sdk.withdraw('USDT', '1', '1', "withdrawal-wallet-address", '6', '0.1');
     /* coin: string, e.g. ("USTD"), assetId: string|number, withdrawalAddress: string,
-    decimal: number|string, network: string this is default to "arbitrum" you can replace it with your network */
+    decimal: number|string, network: string this is default to "arbitrum" you can replace it with your network
+    maxFees: string
+    */
 
     const balance3 = await sdk.getAccountBalance(accountId);  //Fill accountId: number|string
     console.log('Account balance after the withdrawal. Response:', balance3);
-
-    //Transfer crypto to another subaccount
-    const transfer = sdk.transfer('1', "1", 'USDT', 'receivingAddress');
-    /* assetId: string|number, quantity: number|string, coin: string,
-    receivingAddress: string, begin with "0x" */
-    const balance4 = await sdk.getAccountBalance(accountId);
-    console.log('Account balance after the transfer. Response:', balance4);
 
     //Get order history
     const orderHistory = await sdk.getOrderHistory()
@@ -112,20 +110,26 @@ console.log('SDK initialized.');
             side: "BID",
             quantity: ".0001",
             price: "100010",
+            maxFeesPercent: "0.045",
+            contractId: 2,
+            underlyingDecimals: 10        
         },
-        {
-            action: "modify",
-            symbol: "BTC/USDT-P",
-            orderId: "00000000000000", //replace it with the orderId you want to modify
-            orderType: "LIMIT",
-            side: "ASK",
-            updatedQuantity: "0.001",
-            updatedPrice: "100000.1",
-        },
+         {
+             action: "modify",
+             symbol: "SOL/USDT-P",
+             orderId: "000000000000000000", //replace it with the orderId you want to modify
+             orderType: "LIMIT",
+             side: "ASK",
+             updatedQuantity: "0.0001",
+             updatedPrice: "100000.1",
+             maxFeesPercent: "0.045",
+             contractId: 3,
+             underlyingDecimals: 8
+         },
 
         {
             action: "cancel",
-            orderId: "00000000000000",  // replace it with the orderId you want to cancel
+            orderId: "0000000000000000000",  // replace it with the orderId you want to cancel
         }
     ];
 
