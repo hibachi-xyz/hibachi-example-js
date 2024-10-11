@@ -84,7 +84,7 @@ console.log('SDK initialized.');
     const openOrders3 = await sdk.getOpenOrders();
     console.log('Number of open orders:', openOrders3.length);//should be 0 if all the orders are cancelled
 
-
+    //withdrawal
     const balance2 = await sdk.getAccountBalance(accountId);  //Fill accountId: number|string
     console.log('Account balance before the withdrawal. Response:', balance2);
     console.log('begin to withdrawal');
@@ -96,6 +96,13 @@ console.log('SDK initialized.');
 
     const balance3 = await sdk.getAccountBalance(accountId);  //Fill accountId: number|string
     console.log('Account balance after the withdrawal. Response:', balance3);
+
+    //Transfer crypto to another account
+    const transfer = sdk.transfer('1', "0.1", 'USDT', 'receiving-address', '1');
+    /* assetId: string|number, quantity: number|string, coin: string,
+    receivingAddress: string, begin with "0x", maxFees: string */
+    const balance4 = await sdk.getAccountBalance(accountId);
+    console.log('Account balance after the transfer. Response:', balance4);
 
     //Get order history
     const orderHistory = await sdk.getOrderHistory()
